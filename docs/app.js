@@ -531,8 +531,9 @@
         <label class="f">Попыток дозвониться</label><input id="s-max" inputmode="numeric" value="${esc(s.max_attempts)}">
         <label class="f">Номер, с которого звонит Alex</label>
         <select id="s-num">
+          <option value="phnum_1001m7xbqh18f4br20t1vwzq21hr" ${s.phone_number_id === 'phnum_1001m7xbqh18f4br20t1vwzq21hr' ? 'selected' : ''}>+1 236 800 3855 (Канада, Alex)</option>
           <option value="phnum_5201m7v36e37epmrwpycavvgpvd3" ${s.phone_number_id === 'phnum_5201m7v36e37epmrwpycavvgpvd3' ? 'selected' : ''}>+1 217 727 6180 (США)</option>
-          <option value="phnum_1001m7v228xfemjryymf5m9egaq1" ${s.phone_number_id === 'phnum_1001m7v228xfemjryymf5m9egaq1' ? 'selected' : ''}>+1 236 969 9779 (Канада)</option>
+          <option value="phnum_1001m7v228xfemjryymf5m9egaq1" ${s.phone_number_id === 'phnum_1001m7v228xfemjryymf5m9egaq1' ? 'selected' : ''}>+1 236 969 9779 (твой личный)</option>
         </select>
       </div>
       <button class="btn primary block" id="s-save">Сохранить настройки</button>
