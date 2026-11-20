@@ -300,7 +300,7 @@
       const h = prompt('Instagram этого бизнеса (например @barbershop или ссылка):');
       if (h && h.trim()) act('updateFound', { id: b.dataset.igset, patch: { instagram: h.trim() } }, 'Instagram добавлен');
     });
-    $view.querySelectorAll('[data-mail]').forEach((b) => b.onclick = () => writeTo(b.dataset.mail));
+    $view.querySelectorAll('[data-mail]').forEach((b) => b.onclick = (ev) => writeTo(b.dataset.mail, ev));
     $view.querySelectorAll('[data-skip]').forEach((b) => b.onclick = () => act('updateFound', { id: b.dataset.skip, patch: { status: 'не писать' } }, 'Отмечено'));
     $view.querySelectorAll('[data-fdel]').forEach((b) => b.onclick = async () => {
       if (!confirm('Удалить из списка?')) return;
@@ -317,7 +317,9 @@
       <div class="small" style="margin-top:4px">${f.website ? 'Сайт: ' + esc(f.website) : 'Сайта нет'}${f.maps_url ? ` · <a href="${esc(f.maps_url)}" target="_blank" rel="noopener">карта</a>` : ''}</div>
       ${f.note ? `<div class="small">${esc(f.note)}</div>` : ''}
       <div class="row">
-        ${f.status !== 'не писать' ? `<button class="btn primary" data-mail="${esc(f.id)}" ${canWrite ? '' : 'disabled'}>${canWrite ? 'Написать' : 'Нет контакта'}</button>` : ''}
+        ${f.status !== 'не писать' && !f.email && f.instagram ? `<a class="btn primary" data-mail="${esc(f.id)}" href="${esc(igUrl(f.instagram))}" target="_blank" rel="noopener">Написать в Instagram</a>` : ''}
+        ${f.status !== 'не писать' && (f.email || !f.instagram) ? `<button class="btn primary" data-mail="${esc(f.id)}" ${canWrite ? '' : 'disabled'}>${canWrite ? 'Написать' : 'Нет контакта'}</button>` : ''}
+        ${f.instagram ? `<a class="btn" href="${esc(igUrl(f.instagram))}" target="_blank" rel="noopener">Открыть Instagram</a>` : ''}
         ${!canWrite && f.status !== 'не писать' ? `<button class="btn" data-igfind="${esc(f.id)}">Найти Instagram</button><button class="btn" data-igset="${esc(f.id)}">Вписать</button>` : ''}
         ${f.status === 'новый' ? `<button class="btn" data-skip="${esc(f.id)}">Не писать</button>` : ''}
         <button class="btn danger" data-fdel="${esc(f.id)}">Удалить</button>
@@ -325,10 +327,16 @@
     </div>`;
   }
 
-  async function writeTo(id) {
+  function igHandle(v) {
+    return String(v || '').trim().replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').split(/[/?#\s]/)[0];
+  }
+  function igUrl(v) { return 'https://www.instagram.com/' + encodeURIComponent(igHandle(v)) + '/'; }
+
+  async function writeTo(id, ev) {
     const f = state.data.found.find((x) => x.id === id);
     const s = state.data.settings;
     if (!s.sender_contact) {
+      if (ev) ev.preventDefault();
       toast('Сначала заполни «Контакт для писем» в Настройках: закон Канады требует указать в письме адрес или телефон отправителя.', true);
       state.tab = 'settings'; render();
       return;
@@ -342,8 +350,7 @@
       // Start the copy and open Instagram in the same click, so the browser does not block the new tab.
       let copied;
       try { copied = navigator.clipboard.writeText(dm); } catch (e) { copied = Promise.reject(e); }
-      const handle = String(f.instagram).replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/\/$/, '');
-      window.open('https://instagram.com/' + encodeURIComponent(handle), '_blank');
+      // The Instagram page itself is opened by the link the user tapped (an <a>, so the phone never blocks it).
       copied.then(
         () => toast('Текст скопирован. Вставь его в сообщение в Instagram.'),
         () => toast('Не удалось скопировать текст. Скопируй его из Настроек → текст письма.', true),
