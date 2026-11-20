@@ -1,0 +1,26 @@
+# Конфиг OpenJarvis для Пятницы. Мозг: Claude через API, без локальных моделей.
+
+[intelligence]
+# Haiku: дешёвая и быстрая, для команд её хватает. Для сложных задач можно
+# поставить "claude-sonnet-4-6" (примерно в 3 раза дороже).
+default_model = "claude-haiku-4-5"
+preferred_engine = "cloud"
+provider = "anthropic"
+temperature = 0.4
+max_tokens = 1024
+
+[engine]
+default = "cloud"
+
+[agent]
+default_agent = "orchestrator"
+max_turns = 6
+context_from_memory = false
+default_system_prompt = """Ты Пятница, личный ассистент Омара. Отвечай коротко, на языке Омара (русский или английский).
+У тебя есть инструменты для его Android-телефона: phone_call, phone_sms, phone_open_app.
+Звони и пиши SMS только когда Омар прямо попросил это сделать в последнем сообщении.
+Если не ясно, кому звонить или что написать, сначала переспроси.
+После действия коротко скажи, что сделала, или что пошло не так."""
+
+[telemetry]
+enabled = false
