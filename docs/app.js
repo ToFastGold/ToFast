@@ -312,6 +312,7 @@
       }
       askSent(b.dataset.sms);
     });
+    $view.querySelectorAll('[data-unskip]').forEach((b) => b.onclick = () => act('updateFound', { id: b.dataset.unskip, patch: { status: 'новый' } }, 'Вернул в «новый»'));
     $view.querySelectorAll('[data-skip]').forEach((b) => b.onclick = () => act('updateFound', { id: b.dataset.skip, patch: { status: 'не писать' } }, 'Отмечено'));
     $view.querySelectorAll('[data-fdel]').forEach((b) => b.onclick = async () => {
       if (!confirm('Удалить из списка?')) return;
@@ -334,6 +335,7 @@
         ${f.phone && f.status !== 'не писать' ? `<a class="btn" data-sms="${esc(f.id)}" href="${esc(smsUrl(f))}">SMS</a><a class="btn" href="tel:${esc(String(f.phone).replace(/[^\d+]/g, ''))}">Позвонить</a>` : ''}
         ${!canWrite && f.status !== 'не писать' ? `<button class="btn" data-igfind="${esc(f.id)}">Найти Instagram</button><button class="btn" data-igset="${esc(f.id)}">Вписать</button>` : ''}
         ${f.status === 'новый' ? `<button class="btn" data-skip="${esc(f.id)}">Не писать</button>` : ''}
+        ${f.status === 'не писать' ? `<button class="btn" data-unskip="${esc(f.id)}">Вернуть в новые</button>` : ''}
         <button class="btn danger" data-fdel="${esc(f.id)}">Удалить</button>
       </div>
     </div>`;
