@@ -256,8 +256,10 @@ class Store:
                     iso = d.isoformat()
                     sched = scheduled_on(g, d)
                     is_done = iso in done_set
-                    if d < start or d > today:
+                    if d < start:
                         status = "none"
+                    elif d > today:
+                        status = "upcoming" if sched else "off"
                     elif is_done:
                         status = "done"
                     elif not sched:

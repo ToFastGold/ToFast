@@ -63,7 +63,8 @@ function render(s) {
 
   renderMonthCard(s);
   renderRewards(s, current);
-  renderWeek(s, current);
+  renderMatrix(s);
+  renderTrend(s);
   renderCoach(s, current);
   renderGoals(s, current);
   $("empty").hidden = s.goals.length > 0;
@@ -120,49 +121,81 @@ function renderRewards(s, current) {
   }
 }
 
-function weekDates(s, current) {
-  // Monday..Sunday of today's week, or of the month's last week when looking back
-  const anchor = current ? s.today : isoDay(s.month, s.days_in_month);
-  const d = new Date(anchor + "T12:00:00");
-  d.setDate(d.getDate() - weekdayOf(anchor));
-  return Array.from({ length: 7 }, (_, i) => {
-    const x = new Date(d);
-    x.setDate(d.getDate() + i);
-    return x.getFullYear() + "-" + String(x.getMonth() + 1).padStart(2, "0") + "-" + String(x.getDate()).padStart(2, "0");
-  });
-}
-
 function statusOf(g, iso) {
   if (iso.slice(0, 7) !== state.month) return "none";
   return g.day_status[Number(iso.slice(8)) - 1];
 }
 
-function circleButton(g, iso, status) {
-  const b = el("button", "circle " + status);
-  const clickable = status !== "none";
+function cell(g, iso, status, cls) {
+  const b = el("button", cls + " " + status);
+  const clickable = !["none", "upcoming"].includes(status) && !(status === "off" && iso > state.today);
   b.disabled = !clickable;
   b.setAttribute("aria-label", `${g.title}, ${iso}`);
   if (clickable) b.onclick = (ev) => { ev.stopPropagation(); toggle(g, iso, status !== "done"); };
   return b;
 }
+const circleButton = (g, iso, status) => cell(g, iso, status, "circle");
 
-function renderWeek(s, current) {
-  const card = $("week-card");
+function renderMatrix(s) {
+  const card = $("matrix-card");
   card.hidden = !s.goals.length;
   if (!s.goals.length) return;
-  $("week-label").textContent = current ? "Эта неделя" : "Последняя неделя";
-  const dates = weekDates(s, current);
-  const grid = $("week");
-  const cells = [el("span")];
-  dates.forEach((iso, i) => cells.push(el("span", "wd" + (iso === s.today ? " today" : ""), WD[i])));
-  s.goals.forEach((g, gi) => {
-    if (gi) cells.push(el("div", "sep"));
-    const name = el("span", "name");
+  const grid = $("matrix");
+  grid.style.gridTemplateColumns = `116px repeat(${s.days_in_month}, 24px)`;
+  const cells = [el("div", "hname head", "Мои цели")];
+  for (let d = 1; d <= s.days_in_month; d++) {
+    const iso = isoDay(s.month, d);
+    cells.push(el("div", "col" + (iso === s.today ? " today" : ""), `<i>${WD[weekdayOf(iso)].toLowerCase()}</i><b>${d}</b>`));
+  }
+  for (const g of s.goals) {
+    const name = el("div", "hname");
     name.textContent = g.title;
     cells.push(name);
-    dates.forEach((iso) => cells.push(circleButton(g, iso, statusOf(g, iso))));
-  });
+    for (let d = 1; d <= s.days_in_month; d++) cells.push(cell(g, isoDay(s.month, d), g.day_status[d - 1], "sq"));
+  }
   grid.replaceChildren(...cells);
+  const scroller = $("matrix-scroll");
+  if (s.month === s.today.slice(0, 7)) {
+    const day = Number(s.today.slice(8));
+    scroller.scrollLeft = Math.max(0, (day - 6) * 29);
+  }
+}
+
+function renderTrend(s) {
+  const card = $("trend-card");
+  const pts = [];
+  for (let d = 1; d <= s.days_in_month; d++) {
+    let done = 0, counted = 0;
+    for (const g of s.goals) {
+      const st = g.day_status[d - 1];
+      if (st === "done" || st === "missed") counted++;
+      if (st === "done") done++;
+    }
+    if (counted) pts.push([d, (100 * done) / counted]);
+  }
+  card.hidden = pts.length < 2;
+  if (pts.length < 2) return;
+  const avg = pts.slice(-7).reduce((a, p) => a + p[1], 0) / Math.min(7, pts.length);
+  $("trend-pill").textContent = `за 7 дней: ${Math.round(avg)}%`;
+
+  const svg = $("trend");
+  const W = Math.max(240, svg.clientWidth || 320), H = 150, L = 34, R = 6, T = 8, B = 18;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  const x = (d) => L + ((d - 1) / Math.max(1, s.days_in_month - 1)) * (W - L - R);
+  const y = (p) => T + (1 - p / 100) * (H - T - B);
+  const thr = s.rewards.length ? s.rewards[0].percent : 70;
+  const line = pts.map(([d, p], i) => (i ? "L" : "M") + x(d).toFixed(1) + " " + y(p).toFixed(1)).join(" ");
+  const area = line + ` L${x(pts[pts.length - 1][0]).toFixed(1)} ${y(0)} L${x(pts[0][0]).toFixed(1)} ${y(0)} Z`;
+  const last = pts[pts.length - 1];
+  const xl = [1, 10, 20, s.days_in_month].map((d) => `<text class="ylab" x="${x(d)}" y="${H - 2}" text-anchor="middle">${d}</text>`).join("");
+  svg.innerHTML = `
+    <defs><linearGradient id="tg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e0b45a" stop-opacity=".28"/><stop offset="1" stop-color="#e0b45a" stop-opacity="0"/>
+    </linearGradient></defs>
+    ${[0, 50, 100].map((p) => `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(p)}" y2="${y(p)}"/><text class="ylab" x="0" y="${y(p) + 4}">${p}%</text>`).join("")}
+    <line class="thr" x1="${L}" x2="${W - R}" y1="${y(thr)}" y2="${y(thr)}"/>
+    <path class="area" d="${area}"/><path class="line" d="${line}"/>
+    <circle class="pt" cx="${x(last[0])}" cy="${y(last[1])}" r="3.5"/>${xl}`;
 }
 
 function renderCoach(s, current) {
@@ -225,16 +258,6 @@ function renderGoals(s, current) {
 
     if (open.has(g.id)) {
       const body = el("div", "goal-body");
-      const grid = el("div", "month-grid");
-      const firstWd = weekdayOf(isoDay(s.month, 1));
-      for (let i = 0; i < firstWd; i++) grid.appendChild(el("span"));
-      for (let d = 1; d <= s.days_in_month; d++) {
-        const iso = isoDay(s.month, d);
-        const cell = el("div");
-        cell.append(circleButton(g, iso, g.day_status[d - 1]), el("div", "num", d));
-        grid.appendChild(cell);
-      }
-      body.appendChild(grid);
       if (!(s.month < s.today.slice(0, 7))) {
         let days = g.schedule;
         body.appendChild(el("p", "hint", "Расписание. Меняется с сегодняшнего дня, прошлые дни остаются как были."));

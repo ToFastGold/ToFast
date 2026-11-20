@@ -36,14 +36,22 @@
       <div id="rewards"></div>
     </section>
 
-    <section class="card" id="week-card">
-      <div class="card-head"><span class="label" id="week-label">Эта неделя</span></div>
-      <div class="week" id="week"></div>
+    <section class="card" id="matrix-card">
+      <div class="card-head"><span class="label">Матрица привычек</span></div>
+      <div class="matrix-scroll" id="matrix-scroll"><div class="matrix" id="matrix"></div></div>
       <div class="legend">
-        <span><i class="dot done"></i>Выполнено</span>
-        <span><i class="dot missed"></i>Пропущено</span>
-        <span><i class="dot due"></i>Сегодня</span>
+        <span><i class="sq done"></i>Выполнено</span>
+        <span><i class="sq missed"></i>Пропущено</span>
+        <span><i class="sq due"></i>Сегодня</span>
+        <span><i class="sq upcoming"></i>Впереди</span>
+        <span><i class="sq off"></i>Не по плану</span>
       </div>
+    </section>
+
+    <section class="card" id="trend-card">
+      <div class="card-head"><span class="label">Динамика</span><span class="pill" id="trend-pill"></span></div>
+      <svg class="trend" id="trend" role="img" aria-label="Процент выполнения по дням"></svg>
+      <p class="caption">Процент выполненного за каждый день. Пунктир: порог первой награды.</p>
     </section>
 
     <section class="coach" id="coach-box">
