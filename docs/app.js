@@ -8,6 +8,10 @@
     del(k) { try { localStorage.removeItem('alex_' + k); } catch (e) { /* ignore */ } },
   };
 
+  const MAPS_CITIES = ['Victoria', 'Saanich', 'Langford', 'Nanaimo', 'Vancouver', 'Burnaby', 'Surrey', 'Richmond', 'Coquitlam', 'North Vancouver', 'Kelowna', 'Kamloops'];
+  const MAPS_QUERIES = ['barber', 'hair salon', 'nail salon', 'lash studio', 'auto repair', 'mobile car detailing', 'cleaning service',
+    'landscaping', 'handyman', 'painter', 'moving company', 'bakery', 'food truck', 'restaurant', 'cafe', 'tattoo shop', 'massage', 'dog grooming'];
+
   const state = {
     tab: LS.get('tab', 'clients'),
     data: null,
@@ -274,11 +278,28 @@
     $view.innerHTML = `
       <div class="between"><div class="sub">Найдено: ${list.length}</div>
         <button class="btn" id="import-leads">Загрузить новых</button></div>
-      <p class="small">Сначала пишем письмо. Кто оставит номер на странице, попадёт в «Клиенты», и тогда Alex сможет позвонить.</p>
+      <div class="card">
+        <label class="f" style="margin-top:0">Искать в Google Maps бизнесы без сайта</label>
+        <input id="m-q" list="m-qs" placeholder="кого искать, например barber" value="${esc(state.mapsQuery || '')}">
+        <datalist id="m-qs">${MAPS_QUERIES.map((q) => `<option value="${esc(q)}">`).join('')}</datalist>
+        <select id="m-city">${MAPS_CITIES.map((c) => `<option ${c === (state.mapsCity || 'Victoria') ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>
+        <div class="row"><button class="btn primary" id="m-go" ${state.data.settings.places_key_set ? '' : 'disabled'}>Искать</button></div>
+        ${state.data.settings.places_key_set ? '<div class="small">Один поиск это до 60 бизнесов. В список попадут только те, у кого нет своего сайта.</div>' : '<div class="small">Сначала добавь ключ Google Maps в Настройках.</div>'}
+      </div>
+      <p class="small">Сначала пишем сообщение. Кто оставит номер на странице, попадёт в «Клиенты», и тогда Alex сможет позвонить.</p>
       <div class="chips">${filters.map((f) => `<button data-f="${esc(f)}" class="${state.foundFilter === f ? 'on' : ''}">${f === 'all' ? 'Все' : esc(f)}${f !== 'all' && counts[f] ? ' ' + counts[f] : ''}</button>`).join('')}</div>
       ${shown.length ? shown.map(foundCard).join('') : '<div class="empty">Здесь пусто.</div>'}`;
     $view.querySelectorAll('.chips button').forEach((b) => b.onclick = () => { state.foundFilter = b.dataset.f; render(); });
     document.getElementById('import-leads').onclick = importLeads;
+    document.getElementById('m-go').onclick = searchMaps;
+    $view.querySelectorAll('[data-igfind]').forEach((b) => b.onclick = () => {
+      const f = state.data.found.find((x) => x.id === b.dataset.igfind);
+      window.open('https://www.google.com/search?q=' + encodeURIComponent(f.business + ' ' + f.city + ' instagram'), '_blank');
+    });
+    $view.querySelectorAll('[data-igset]').forEach((b) => b.onclick = () => {
+      const h = prompt('Instagram этого бизнеса (например @barbershop или ссылка):');
+      if (h && h.trim()) act('updateFound', { id: b.dataset.igset, patch: { instagram: h.trim() } }, 'Instagram добавлен');
+    });
     $view.querySelectorAll('[data-mail]').forEach((b) => b.onclick = () => writeTo(b.dataset.mail));
     $view.querySelectorAll('[data-skip]').forEach((b) => b.onclick = () => act('updateFound', { id: b.dataset.skip, patch: { status: 'не писать' } }, 'Отмечено'));
     $view.querySelectorAll('[data-fdel]').forEach((b) => b.onclick = async () => {
@@ -296,7 +317,8 @@
       <div class="small" style="margin-top:4px">${f.website ? 'Сайт: ' + esc(f.website) : 'Сайта нет'}${f.maps_url ? ` · <a href="${esc(f.maps_url)}" target="_blank" rel="noopener">карта</a>` : ''}</div>
       ${f.note ? `<div class="small">${esc(f.note)}</div>` : ''}
       <div class="row">
-        ${f.status !== 'не писать' ? `<button class="btn primary" data-mail="${esc(f.id)}" ${canWrite ? '' : 'disabled'}>${canWrite ? 'Написать' : 'Нет email'}</button>` : ''}
+        ${f.status !== 'не писать' ? `<button class="btn primary" data-mail="${esc(f.id)}" ${canWrite ? '' : 'disabled'}>${canWrite ? 'Написать' : 'Нет контакта'}</button>` : ''}
+        ${!canWrite && f.status !== 'не писать' ? `<button class="btn" data-igfind="${esc(f.id)}">Найти Instagram</button><button class="btn" data-igset="${esc(f.id)}">Вписать</button>` : ''}
         ${f.status === 'новый' ? `<button class="btn" data-skip="${esc(f.id)}">Не писать</button>` : ''}
         <button class="btn danger" data-fdel="${esc(f.id)}">Удалить</button>
       </div>
@@ -316,13 +338,37 @@
     if (f.email) {
       window.location.href = 'mailto:' + encodeURIComponent(f.email) + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
     } else {
-      try { await navigator.clipboard.writeText(body); toast('Текст скопирован. Вставь его в сообщение в Instagram.'); } catch (e) { /* ignore */ }
+      const dm = body.replace(/reply to this email/gi, 'reply to this message').replace(/email you again/gi, 'message you again');
+      // Start the copy and open Instagram in the same click, so the browser does not block the new tab.
+      let copied;
+      try { copied = navigator.clipboard.writeText(dm); } catch (e) { copied = Promise.reject(e); }
       const handle = String(f.instagram).replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/\/$/, '');
       window.open('https://instagram.com/' + encodeURIComponent(handle), '_blank');
+      copied.then(
+        () => toast('Текст скопирован. Вставь его в сообщение в Instagram.'),
+        () => toast('Не удалось скопировать текст. Скопируй его из Настроек → текст письма.', true),
+      );
     }
     setTimeout(() => {
       if (confirm('Сообщение отправлено? Отметить «написали».')) act('updateFound', { id: id, patch: { status: 'написали' } }, 'Отмечено');
     }, 1500);
+  }
+
+  async function searchMaps() {
+    const q = document.getElementById('m-q').value.trim();
+    const city = document.getElementById('m-city').value;
+    if (!q) return toast('Напиши, кого искать', true);
+    state.mapsQuery = q; state.mapsCity = city;
+    const btn = document.getElementById('m-go');
+    btn.disabled = true; btn.textContent = 'Ищу…';
+    try {
+      const r = await api('searchMaps', { query: q, city: city });
+      toast(`Нашёл ${r.total}, без сайта ${r.without_site}, новых добавлено ${r.added}`);
+      await load(true);
+    } catch (e) {
+      toast(e.message, true);
+      btn.disabled = false; btn.textContent = 'Искать';
+    }
   }
 
   async function importLeads() {
@@ -464,6 +510,8 @@
       <div class="card">
         <label class="f" style="margin-top:0">Ключ ElevenLabs ${s.api_key_set ? '(уже задан)' : '(не задан)'}</label>
         <input id="s-key" type="password" placeholder="${s.api_key_set ? 'оставь пустым, чтобы не менять' : 'вставь ключ'}">
+        <label class="f">Ключ Google Maps ${s.places_key_set ? '(уже задан)' : '(не задан)'}</label>
+        <input id="s-pkey" type="password" placeholder="${s.places_key_set ? 'оставь пустым, чтобы не менять' : 'вставь ключ'}">
         <label class="f">Адрес для Make (итоги звонков)</label>
         <code class="copy">${esc(s.webhook_url)}</code>
         <div class="row"><button class="btn" id="s-copy-hook">Скопировать адрес</button></div>
@@ -493,10 +541,11 @@
     document.getElementById('s-push').onclick = () => act('testPush', {}, 'Отправлено. Уведомление должно прийти через пару секунд.');
     document.getElementById('s-save2').onclick = async () => {
       const key = v('s-key').trim();
+      const pkey = v('s-pkey').trim();
       const np = v('s-pin').trim();
       if (np && np.length < 4) return toast('PIN минимум 4 цифры', true);
       try {
-        await api('saveSettings', { api_key: key || undefined, new_pin: np || undefined });
+        await api('saveSettings', { api_key: key || undefined, places_key: pkey || undefined, new_pin: np || undefined });
         if (np) LS.set('pin', np);
         toast('Сохранено');
         await load(true);

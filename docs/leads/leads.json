@@ -1,1 +1,8 @@
-[]
+[
+  {"business": "Blush Nail Spa", "category": "Ногти / красота", "city": "Victoria", "phone": "+1 778 265-7089", "instagram": "blushnailspavic", "maps_url": "https://www.openstreetmap.org/node/6651889240", "note": "3571 Blanshard St (Uptown). В Instagram 1,6 тыс. подписчиков, сайта не нашёл."},
+  {"business": "Vic City Barbers", "category": "Барбершоп", "city": "Victoria", "phone": "+1 778 432-2099", "instagram": "viccitybarbers", "note": "920 Johnson St. Запись через Setmore, своего сайта не нашёл."},
+  {"business": "Central Barbers & Stylists", "category": "Барбершоп", "city": "Victoria", "phone": "+1 250 385-6831", "instagram": "centralbarbersandstylist", "note": "636 Fort St (The Bay Centre). 600+ отзывов, запись через Fresha, своего сайта не нашёл."},
+  {"business": "Stir-it-Up Caribbean Restaurant", "category": "Кафе / еда", "city": "Victoria", "phone": "+1 778 432-0133", "instagram": "stiritup.yyj", "note": "760A Yates St. Есть Instagram и Facebook, сайта не нашёл."},
+  {"business": "Loveleen's Indian Sweets & Snacks", "category": "Кафе / еда", "city": "Victoria", "phone": "+1 250 995-2852", "instagram": "loveleens_", "note": "852 Fort St. Только Instagram, Uber Eats и DoorDash, сайта не нашёл."},
+  {"business": "Cliff's Classic Barbershop", "category": "Барбершоп", "city": "Victoria", "phone": "+1 250 380-7378", "note": "414 Craigflower Rd (Vic West). Только страница в Facebook: facebook.com/pages/Cliffs-Classic-Barbershop/468316413179808. Instagram и email не нашёл, кнопка «Написать» не сработает."}
+]
