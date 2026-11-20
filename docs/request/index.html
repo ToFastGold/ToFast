@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>A website for your business from $99 CAD</title>
+  <meta name="description" content="Simple, mobile-friendly websites for small businesses in BC, from $99 CAD. Leave your number and our AI assistant Alex will call you back.">
+  <style>
+    :root { --bg:#f4f6f8; --card:#fff; --text:#14202b; --muted:#5d6b78; --line:#dde3e8; --accent:#0f766e; --accent-text:#fff; --danger:#b42318; }
+    @media (prefers-color-scheme: dark) { :root { --bg:#0f1419; --card:#182028; --text:#e6edf3; --muted:#93a1ad; --line:#2a3540; --accent:#2bb3a3; --accent-text:#06201d; --danger:#ff7b72; } }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font:17px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+    main { max-width:560px; margin:0 auto; padding:32px 16px 48px; }
+    h1 { font-size:30px; line-height:1.2; margin:0 0 12px; }
+    .lead { color:var(--muted); margin:0 0 24px; }
+    ul { padding-left:20px; margin:0 0 24px; }
+    li { margin:4px 0; }
+    form { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px; }
+    label { display:block; font-size:14px; color:var(--muted); margin:12px 0 4px; }
+    input, textarea { width:100%; padding:11px 12px; border:1px solid var(--line); border-radius:10px; background:var(--card); color:var(--text); font:inherit; }
+    textarea { min-height:80px; }
+    .consent { display:flex; gap:10px; align-items:flex-start; margin:16px 0; font-size:15px; }
+    .consent input { width:auto; margin-top:4px; flex:none; }
+    button { width:100%; padding:14px; border:0; border-radius:10px; background:var(--accent); color:var(--accent-text); font-size:17px; font-weight:600; cursor:pointer; }
+    button:disabled { opacity:.6; }
+    .hp { position:absolute; left:-9999px; }
+    .msg { margin-top:14px; font-size:15px; }
+    .err { color:var(--danger); }
+    .small { font-size:13px; color:var(--muted); margin-top:20px; }
+    .done { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:24px 18px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>A website for your business from $99 CAD</h1>
+  <p class="lead">Simple, mobile-friendly websites for small businesses in BC. Leave your number and Alex, our AI assistant, will call you to ask what you need and give you a price.</p>
+  <ul>
+    <li>One-page site with your services, hours, photos and a contact form</li>
+    <li>Looks good on phones and computers</li>
+    <li>Prices start at $99 CAD</li>
+  </ul>
+
+  <form id="f" novalidate>
+    <label for="name">Your name</label>
+    <input id="name" name="name" autocomplete="name">
+    <label for="business">Business name</label>
+    <input id="business" name="business" autocomplete="organization">
+    <label for="phone">Phone number *</label>
+    <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="(604) 555-0123" required>
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" inputmode="email" autocomplete="email">
+    <label for="city">City</label>
+    <input id="city" name="city" autocomplete="address-level2">
+    <label for="needs">What kind of website do you need?</label>
+    <textarea id="needs" name="needs" placeholder="For example: a page for my salon with prices and online booking"></textarea>
+    <input class="hp" id="website_url_hp" name="website_url_hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+    <div class="consent">
+      <input id="consent" type="checkbox">
+      <label for="consent" style="margin:0;color:var(--text)">I agree to receive a phone call from Alex, an AI voice assistant, at the number above about getting a website. I can ask not to be called again at any time.</label>
+    </div>
+    <button id="go" type="submit">Request a call</button>
+    <div id="msg" class="msg"></div>
+  </form>
+
+  <div id="done" class="done" hidden>
+    <h2 style="margin-top:0">Thanks!</h2>
+    <p>Alex will call you soon, during business hours (Pacific time). If you change your mind, just tell Alex you don't want calls.</p>
+  </div>
+
+  <p class="small">We use your number only to call you about your website request. We don't share it with anyone.</p>
+</main>
+<script src="../config.js"></script>
+<script>
+  (function () {
+    const form = document.getElementById('f');
+    const msg = document.getElementById('msg');
+    const btn = document.getElementById('go');
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      msg.textContent = ''; msg.className = 'msg';
+      const v = (id) => document.getElementById(id).value.trim();
+      const digits = v('phone').replace(/\D/g, '');
+      if (digits.length < 10) { msg.textContent = 'Please enter a valid phone number.'; msg.className = 'msg err'; return; }
+      if (!document.getElementById('consent').checked) { msg.textContent = 'Please tick the box so Alex can call you.'; msg.className = 'msg err'; return; }
+      const url = (window.ALEX_CONFIG || {}).scriptUrl;
+      if (!url) { msg.textContent = 'This form is not connected yet. Please try again later.'; msg.className = 'msg err'; return; }
+      btn.disabled = true; btn.textContent = 'Sending…';
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'request', name: v('name'), business: v('business'), phone: v('phone'), email: v('email'),
+            city: v('city'), needs: v('needs'), website_url_hp: v('website_url_hp'), consent: true,
+          }),
+        }).then((r) => r.json());
+        if (!res.ok) throw new Error(res.error || 'Something went wrong');
+        form.hidden = true;
+        document.getElementById('done').hidden = false;
+      } catch (err) {
+        msg.textContent = 'Sorry, that did not go through: ' + err.message;
+        msg.className = 'msg err';
+        btn.disabled = false; btn.textContent = 'Request a call';
+      }
+    });
+  })();
+</script>
+</body>
+</html>
