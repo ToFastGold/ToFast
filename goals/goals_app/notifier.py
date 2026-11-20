@@ -58,12 +58,12 @@ class Telegram:
 def reminder_text(s: dict) -> str | None:
     if not s["goals"]:
         return None
-    left = [g["title"] for g in s["goals"] if not g["done_today"]]
+    left = [g["title"] for g in s["goals"] if g["scheduled_today"] and not g["done_today"]]
     lines = []
     if left:
         lines.append("Вечерняя проверка. Сегодня ещё не отмечено: " + ", ".join(left) + ".")
     else:
-        lines.append("Все цели на сегодня отмечены. Красавчик.")
+        lines.append("Всё, что было на сегодня, отмечено. Красавчик.")
     lines.append(f"За {month_name(s['month'])}: {s['overall_percent']:.0f}%.")
     if s["reward"]:
         lines.append(f"Сейчас открыто: {s['reward']}.")

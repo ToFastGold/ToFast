@@ -1,8 +1,12 @@
 """Goals data: monthly goals, daily ticks, reward tiers. Stored in one JSON file.
 
-Percent for a goal = ticked days / counted days. Counted days run from the
-later of (month start, day the goal was added) up to yesterday, plus today
-once it is ticked. So an unticked morning does not drag the number down.
+Percent for a goal = ticked days / counted days. A day counts when it is on the
+goal's schedule (weekdays) or when it was ticked anyway. Counting runs from the
+later of (month start, day the goal was added) up to yesterday, plus today once
+it is ticked, so an unticked morning does not drag the number down.
+
+Schedules keep history: changing the weekdays adds an entry that applies from
+today on, earlier days are judged by the schedule they had.
 """
 
 from __future__ import annotations
@@ -20,6 +24,29 @@ DEFAULT_REWARDS = [
     {"percent": 70, "text": "Вечер игр без чувства вины"},
     {"percent": 80, "text": "Покупка до 50$ на что хочу"},
 ]
+
+
+ALL_DAYS = [0, 1, 2, 3, 4, 5, 6]  # Monday = 0
+
+
+def clean_days(raw: Any) -> list[int]:
+    if raw is None:
+        return list(ALL_DAYS)
+    try:
+        days = sorted({int(d) for d in raw})
+    except (TypeError, ValueError) as exc:
+        raise BadRequest("days: список дней недели 0-6 (0 = понедельник)") from exc
+    if not days or any(d not in ALL_DAYS for d in days):
+        raise BadRequest("days: хотя бы один день, числа 0-6 (0 = понедельник)")
+    return days
+
+
+def scheduled_on(goal: dict[str, Any], d: date) -> bool:
+    days = ALL_DAYS
+    for entry in goal.get("schedule") or []:
+        if entry["from"] <= d.isoformat():
+            days = entry["days"]
+    return d.weekday() in days
 
 
 class GoalNotFound(Exception):
@@ -115,7 +142,7 @@ class Store:
                 return g
         raise GoalNotFound(f"Цель не найдена: {ref!r}")
 
-    def add_goal(self, title: str, month: str | None = None) -> dict[str, Any]:
+    def add_goal(self, title: str, month: str | None = None, days: Any = None) -> dict[str, Any]:
         title = str(title or "").strip()[:100]
         if not title:
             raise BadRequest("Пустое название цели")
@@ -131,9 +158,22 @@ class Store:
                 "title": title,
                 "month": month,
                 "created": created.isoformat(),
+                "schedule": [{"from": created.isoformat(), "days": clean_days(days)}],
             }
             self.data["goals"].append(goal)
             self.data["checks"][goal["id"]] = []
+            self.save()
+        return goal
+
+    def set_schedule(self, ref: str, days: Any, month: str | None = None) -> dict[str, Any]:
+        cleaned = clean_days(days)
+        today = self.today()
+        with self.lock:
+            goal = self.find_goal(ref, month)
+            start = max(today, date.fromisoformat(goal["created"]), parse_month(goal["month"])[0])
+            entries = [e for e in goal.get("schedule") or [] if e["from"] < start.isoformat()]
+            entries.append({"from": start.isoformat(), "days": cleaned})
+            goal["schedule"] = entries
             self.save()
         return goal
 
@@ -152,7 +192,8 @@ class Store:
             existing = {g["title"].casefold() for g in self.goals_for(to_month)}
             for g in self.goals_for(from_month):
                 if g["title"].casefold() not in existing:
-                    self.add_goal(g["title"], to_month)
+                    days = (g.get("schedule") or [{"days": ALL_DAYS}])[-1]["days"]
+                    self.add_goal(g["title"], to_month, days)
                     added += 1
         return added
 
@@ -202,17 +243,47 @@ class Store:
         with self.lock:
             goals_out = []
             total_done = total_counted = 0
+            wd_done = [0] * 7
+            wd_counted = [0] * 7
             for g in self.goals_for(month):
-                start = max(first, date.fromisoformat(g["created"]))
-                done_dates = [d for d in self.data["checks"].get(g["id"], []) if month_key(date.fromisoformat(d)) == month]
-                done_today = today.isoformat() in done_dates
-                if last < today:
-                    counted = (last - start).days + 1
-                elif first > today:
-                    counted = 0
-                else:
-                    counted = max(0, (today - start).days) + (1 if done_today else 0)
-                done = len(done_dates)
+                created = date.fromisoformat(g["created"])
+                start = max(first, created)
+                done_set = {d for d in self.data["checks"].get(g["id"], []) if d.startswith(month)}
+                statuses = []
+                done = counted = 0
+                for day_no in range(1, last.day + 1):
+                    d = first.replace(day=day_no)
+                    iso = d.isoformat()
+                    sched = scheduled_on(g, d)
+                    is_done = iso in done_set
+                    if d < start or d > today:
+                        status = "none"
+                    elif is_done:
+                        status = "done"
+                    elif not sched:
+                        status = "off"
+                    elif d == today:
+                        status = "due"
+                    else:
+                        status = "missed"
+                    statuses.append(status)
+                    if status in ("done", "missed"):
+                        counted += 1
+                        wd_counted[d.weekday()] += 1
+                        if status == "done":
+                            done += 1
+                            wd_done[d.weekday()] += 1
+                streak = 0
+                d = min(today, last)
+                if first <= d and statuses[d.day - 1] in ("due", "off"):
+                    d -= timedelta(days=1)  # today not ticked yet does not break the streak
+                while start <= d <= last:
+                    st = statuses[d.day - 1]
+                    if st == "done":
+                        streak += 1
+                    elif st != "off":
+                        break
+                    d -= timedelta(days=1)
                 pct = round(100.0 * done / counted, 1) if counted else 0.0
                 total_done += done
                 total_counted += counted
@@ -221,11 +292,15 @@ class Store:
                         "id": g["id"],
                         "title": g["title"],
                         "percent": pct,
-                        "done_today": done_today,
+                        "done_today": today.isoformat() in done_set,
+                        "scheduled_today": first <= today <= last and scheduled_on(g, today),
                         "done_days": done,
                         "days_counted": counted,
+                        "streak": streak,
                         "created": g["created"],
-                        "done_dates": done_dates,
+                        "schedule": (g.get("schedule") or [{"days": ALL_DAYS}])[-1]["days"],
+                        "done_dates": sorted(done_set),
+                        "day_status": statuses,
                     }
                 )
             overall = round(100.0 * total_done / total_counted, 1) if total_counted else 0.0
@@ -249,6 +324,11 @@ class Store:
                 "reward_percent": unlocked[-1]["percent"] if unlocked else None,
                 "next_reward": locked[0] if locked else None,
                 "rewards": [{**r, "unlocked": r in unlocked} for r in tiers],
+                "done_total": total_done,
+                "counted_total": total_counted,
+                "weekday_percent": [
+                    round(100.0 * wd_done[i] / wd_counted[i], 1) if wd_counted[i] else None for i in range(7)
+                ],
                 "goals": goals_out,
             }
 

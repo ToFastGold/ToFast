@@ -177,3 +177,26 @@ def test_changing_rewards_keeps_other_months(store, clock):
     assert store.summary("2026-09")["rewards"] == []
     assert [r["percent"] for r in store.summary("2026-10")["rewards"]] == [70, 80]
     assert store.summary("2026-12")["days_left"] == 31
+
+
+def test_schedule_streak_and_weekdays(store, clock):
+    # 2026-11-02 is a Monday
+    clock.d = date(2026, 11, 2)
+    g = store.add_goal("Зал", days=[0, 2, 4])  # Mon, Wed, Fri
+    clock.d = date(2026, 11, 9)  # next Monday
+    for d in ("2026-11-02", "2026-11-04", "2026-11-06", "2026-11-07"):  # Sat is a bonus
+        store.checkin(g["id"], d)
+    goal = store.summary()["goals"][0]
+    assert goal["days_counted"] == 4 and goal["done_days"] == 4 and goal["percent"] == 100.0
+    assert goal["day_status"][:9] == ["none", "done", "off", "done", "off", "done", "done", "off", "due"]
+    assert goal["streak"] == 4
+    # change schedule from today: earlier days keep the old rules
+    store.set_schedule(g["id"], [0, 1, 2, 3, 4, 5, 6])
+    s = store.summary()
+    assert s["goals"][0]["schedule"] == [0, 1, 2, 3, 4, 5, 6]
+    assert s["goals"][0]["day_status"][2] == "off"
+    assert s["done_total"] == 4 and s["counted_total"] == 4
+    assert s["weekday_percent"][0] == 100.0 and s["weekday_percent"][1] is None
+    clock.d = date(2026, 11, 11)
+    goal = store.summary()["goals"][0]
+    assert goal["day_status"][9] == "missed" and goal["streak"] == 0

@@ -116,8 +116,11 @@ def make_handler(store: Store, token: str, notifier: Notifier | None):
                     notifier.after_checkin(before, after)
                 return HTTPStatus.OK, {"ok": True, "summary": after}
             if path == "/api/goals":
-                goal = store.add_goal(body.get("title", ""), month)
+                goal = store.add_goal(body.get("title", ""), month, body.get("days"))
                 return HTTPStatus.OK, {"ok": True, "goal": goal, "summary": store.summary(goal["month"])}
+            if path == "/api/goals/schedule":
+                goal = store.set_schedule(body.get("goal_id", ""), body.get("days"), month)
+                return HTTPStatus.OK, {"ok": True, "summary": store.summary(goal["month"])}
             if path == "/api/goals/delete":
                 store.delete_goal(body.get("goal_id", ""), month)
                 return HTTPStatus.OK, {"ok": True, "summary": store.summary(month)}
