@@ -112,12 +112,8 @@
       try {
         const st = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'status' }) }).then((r) => r.json());
         if (!st.ok) throw new Error(st.error || 'Сервер не ответил');
-        if (!st.pinSet) {
-          if (p.length < 4) return toast('Придумай PIN, минимум 4 цифры', true);
-          const c = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'claim', pin: p }) }).then((r) => r.json());
-          if (!c.ok) throw new Error(c.error);
-          toast('PIN сохранён');
-        }
+        if (!st.pinSet) throw new Error('PIN ещё не создан. Запусти функцию setup в Apps Script (шаг 1 инструкции).');
+        if (!p) return toast('Введи PIN из журнала Apps Script', true);
         LS.set('pin', p);
         document.getElementById('tabs').classList.remove('hidden');
         await load(true);
@@ -128,7 +124,7 @@
     document.getElementById('l-go').onclick = go;
     fetch(scriptUrl() || 'about:blank', { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'status' }) })
       .then((r) => r.json()).then((st) => {
-        if (st && st.ok && !st.pinSet) document.getElementById('l-hint').textContent = 'PIN ещё не задан: придумай его сейчас, он сохранится.';
+        if (st && st.ok && !st.pinSet) document.getElementById('l-hint').textContent = 'PIN ещё не создан: запусти функцию setup в Apps Script.';
       }).catch(() => {});
   }
 
@@ -360,7 +356,8 @@
 
   function callCard(c) {
     const open = state.openCall === c.conversation_id;
-    const mins = c.duration_s ? Math.floor(c.duration_s / 60) + ':' + String(Math.round(c.duration_s % 60)).padStart(2, '0') : '';
+    const secs = Math.round(Number(c.duration_s) || 0);
+    const mins = secs ? Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0') : '';
     const fields = [
       ['Нужен сайт', isTrue(c.wants_website) ? 'да' : ''], ['Какой сайт', c.site_type], ['Бюджет', c.budget], ['Сроки', c.timeline],
       ['Email', c.email], ['Когда удобно', c.best_time], ['Интерес', c.interest],
@@ -416,7 +413,7 @@
         <label class="f" style="margin-top:0">Первая фраза Alex</label>
         <textarea id="s-first">${esc(state.firstMessage == null ? 'Загрузка…' : state.firstMessage)}</textarea>
         <p class="small">Alex говорит её первой на каждом звонке. Пиши на английском и оставь в ней, что Alex — ИИ-помощник.</p>
-        <button class="btn primary" id="s-first-save">Сохранить фразу</button>
+        <button class="btn primary" id="s-first-save" ${state.firstMessage == null ? 'disabled' : ''}>Сохранить фразу</button>
       </div>
 
       <div class="section-title">Расходы</div>
@@ -477,6 +474,7 @@
     const v = (id) => document.getElementById(id).value;
     document.getElementById('s-pause').onclick = () => act('saveSettings', { settings: { paused: s.paused === '1' ? '0' : '1' } }, s.paused === '1' ? 'Звонки включены' : 'Звонки на паузе');
     document.getElementById('s-first-save').onclick = async () => {
+      if (state.firstMessage == null) return toast('Фраза ещё не загрузилась', true);
       try { await api('setFirstMessage', { first_message: v('s-first') }); state.firstMessage = v('s-first'); toast('Фраза сохранена в Alex'); } catch (e) { toast(e.message, true); }
     };
     const usageBtn = document.getElementById('s-usage');
@@ -507,11 +505,11 @@
     document.getElementById('s-logout').onclick = () => { LS.del('pin'); state.data = null; renderLogin(); };
 
     if (state.firstMessage == null && s.api_key_set) {
-      api('getFirstMessage').then((r) => { state.firstMessage = r.first_message; if (state.tab === 'settings') document.getElementById('s-first').value = r.first_message; })
-        .catch(() => { state.firstMessage = ''; });
+      api('getFirstMessage').then((r) => { state.firstMessage = r.first_message; if (state.tab === 'settings') render(); })
+        .catch((e) => { toast('Не удалось загрузить первую фразу: ' + e.message, true); });
     } else if (!s.api_key_set && state.firstMessage == null) {
       state.firstMessage = '';
-      document.getElementById('s-first').value = '';
+      render();
     }
   }
 

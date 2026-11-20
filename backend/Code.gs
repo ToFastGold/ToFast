@@ -64,11 +64,17 @@ function setup() {
   const props = PropertiesService.getScriptProperties();
   if (!props.getProperty('webhook_token')) props.setProperty('webhook_token', randomId_(24));
   if (!props.getProperty('S_ntfy_topic')) props.setProperty('S_ntfy_topic', 'alex-' + randomId_(12).toLowerCase());
+  if (!props.getProperty('pin')) {
+    let pin = '';
+    for (let i = 0; i < 6; i++) pin += Math.floor(Math.random() * 10);
+    props.setProperty('pin', pin);
+  }
   ScriptApp.getProjectTriggers().forEach(function (t) {
     if (t.getHandlerFunction() === 'retryCalls') ScriptApp.deleteTrigger(t);
   });
   ScriptApp.newTrigger('retryCalls').timeBased().everyHours(1).create();
-  Logger.log('Готово. Теперь: Развернуть → Новое развертывание → Веб-приложение.');
+  Logger.log('Твой PIN для входа в приложение: ' + props.getProperty('pin'));
+  Logger.log('Готово. Теперь: Начать развертывание → Новое развертывание → Веб-приложение.');
 }
 
 /* ---------- HTTP ---------- */
@@ -88,7 +94,6 @@ function doPost(e) {
     const action = body.action;
     // Действия без PIN
     if (action === 'status') return json_({ ok: true, pinSet: !!prop_('pin') });
-    if (action === 'claim') return json_(claim_(body));
     if (action === 'request') return json_(publicRequest_(body));
     // Остальное только с PIN
     if (!prop_('pin') || String(body.pin) !== prop_('pin')) return json_({ ok: false, error: 'Неверный PIN' });
@@ -223,18 +228,6 @@ const ACTIONS = {
     return { ok: true };
   },
 };
-
-/* ---------- PIN ---------- */
-
-function claim_(b) {
-  return withLock_(function () {
-    if (prop_('pin')) return { ok: false, error: 'PIN уже задан' };
-    const pin = String(b.pin || '').trim();
-    if (pin.length < 4) return { ok: false, error: 'PIN должен быть не короче 4 цифр' };
-    PropertiesService.getScriptProperties().setProperty('pin', pin);
-    return { ok: true };
-  });
-}
 
 /* ---------- страница заявки ---------- */
 
