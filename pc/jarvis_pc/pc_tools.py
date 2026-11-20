@@ -33,8 +33,11 @@ def _open(target: str) -> None:
     "pc",
 )
 def pc_open(target: str) -> tuple[bool, str]:
-    _open(target.strip())
-    return True, f"Открыла: {target}"
+    def run() -> tuple[bool, str]:
+        _open(target.strip())
+        return True, f"Открыла: {target}"
+
+    return approvals.guard(f"открыть на ПК: {target}", run)
 
 
 @simple_tool(

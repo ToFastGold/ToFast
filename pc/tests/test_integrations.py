@@ -14,10 +14,12 @@ def tool(name):
 
 @pytest.fixture(autouse=True)
 def clean(monkeypatch, tmp_path):
-    for k in ("EMAIL_ADDRESS", "EMAIL_PROVIDER", "MS_CLIENT_ID", "TWILIO_ENABLED", "GOALS_API_URL", "GOALS_API_TOKEN"):
+    for k in ("EMAIL_ADDRESS", "EMAIL_PROVIDER", "MS_CLIENT_ID", "TWILIO_ENABLED", "TWILIO_ACCOUNT_SID",
+              "TWILIO_AUTH_TOKEN", "TWILIO_FROM_NUMBER", "GOALS_API_URL", "GOALS_API_TOKEN"):
         monkeypatch.delenv(k, raising=False)
     monkeypatch.setenv("NOTES_DIR", str(tmp_path / "notes"))
     approvals.cancel()
+    approvals.reset_turn()
 
 
 def test_notes_roundtrip():
@@ -42,7 +44,8 @@ def test_pc_run_waits_for_yes(monkeypatch):
     assert approvals.confirm()[0] is False  # nothing left
 
 
-def test_cancel():
+def test_cancel(monkeypatch):
+    monkeypatch.setattr(pc_tools, "_run", lambda c: pytest.fail("must not run"))
     tool("pc_run").execute(command="shutdown /s")
     assert "Отменено" in approvals.cancel()
     assert approvals.confirm()[0] is False
@@ -191,3 +194,32 @@ def test_ms_not_logged_in(monkeypatch, tmp_path):
     monkeypatch.setattr(ms_graph, "_save", lambda c: None)
     with pytest.raises(RuntimeError, match="login-email"):
         ms_graph._token()
+
+
+def test_email_read_then_call_needs_yes(monkeypatch):
+    from jarvis_pc import email_tools, phone_tools
+
+    sent = []
+    monkeypatch.setattr(phone_tools, "send_command", lambda a, p: (sent.append(a), (True, "ok"))[1])
+    monkeypatch.setattr(pc_tools, "_open", lambda t: sent.append("open"))
+    tool("phone_call").execute(target="Мама")
+    tool("pc_open").execute(target="https://x.com")
+    assert sent == ["call", "open"]  # direct when no email was read
+    monkeypatch.setattr(email_tools, "_imap", lambda: FakeImap())
+    tool("email_read").execute(id="2")
+    assert "ОЖИДАЕТ" in tool("phone_call").execute(target="+1555").content
+    assert sent == ["call", "open"]
+    approvals.reset_turn()
+    tool("pc_open").execute(target="notepad")
+    assert sent[-1] == "open"
+
+
+def test_phone_sms_always_needs_yes(monkeypatch):
+    from jarvis_pc import phone_tools
+
+    sent = []
+    monkeypatch.setattr(phone_tools, "send_command", lambda a, p: (sent.append(p), (True, "ok"))[1])
+    assert "ОЖИДАЕТ" in tool("phone_sms").execute(target="Мама", text="hi").content
+    assert sent == []
+    approvals.confirm()
+    assert sent == [{"target": "Мама", "text": "hi"}]

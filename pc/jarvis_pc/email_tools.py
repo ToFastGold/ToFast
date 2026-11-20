@@ -54,6 +54,7 @@ def _body(msg: email.message.Message) -> str:
     "email",
 )
 def email_list(limit: int = 10, unread_only: bool = False) -> tuple[bool, str]:
+    approvals.mark_untrusted()  # subjects and senders are written by outsiders
     if ms_graph.configured():
         lines = ms_graph.list_messages(int(limit or 10), bool(unread_only))
         return True, "\n".join(lines) if lines else "Писем нет."
@@ -75,6 +76,7 @@ def email_list(limit: int = 10, unread_only: bool = False) -> tuple[bool, str]:
 
 @simple_tool("email_read", "Read one email by the id shown in email_list.", {"id": string("Email id")}, ["id"], "email")
 def email_read(id: str) -> tuple[bool, str]:  # noqa: A002
+    approvals.mark_untrusted()
     if ms_graph.configured():
         return True, ms_graph.read_message(id)
     box = _imap()

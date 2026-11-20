@@ -14,6 +14,8 @@ from openjarvis.core.registry import ToolRegistry
 from openjarvis.core.types import ToolResult
 from openjarvis.tools._stubs import BaseTool, ToolSpec
 
+from jarvis_pc import approvals
+
 TIMEOUT_SECONDS = 10.0
 
 
@@ -83,7 +85,8 @@ class PhoneCallTool(BaseTool):
         target = str(params.get("target", "")).strip()
         if not target:
             return _result("phone_call", False, "Не указано, кому звонить.")
-        return _result("phone_call", *send_command("call", {"target": target}))
+        ok, msg = approvals.guard(f"позвонить: {target}", lambda: send_command("call", {"target": target}))
+        return _result("phone_call", ok, msg)
 
 
 @ToolRegistry.register("phone_sms")
@@ -96,7 +99,8 @@ class PhoneSmsTool(BaseTool):
             name="phone_sms",
             description=(
                 "Send an SMS from the user's Android phone. "
-                "Pass a phone number or a contact name, and the message text."
+                "Pass a phone number or a contact name, and the message text. "
+                "Omar must confirm with /yes before it is sent."
             ),
             parameters={
                 "type": "object",
@@ -114,7 +118,10 @@ class PhoneSmsTool(BaseTool):
         text = str(params.get("text", "")).strip()
         if not target or not text:
             return _result("phone_sms", False, "Нужны и получатель, и текст.")
-        return _result("phone_sms", *send_command("sms", {"target": target, "text": text}))
+        ok, msg = approvals.request(
+            f"SMS с телефона на {target}: {text}", lambda: send_command("sms", {"target": target, "text": text})
+        )
+        return _result("phone_sms", ok, msg)
 
 
 @ToolRegistry.register("phone_open_app")

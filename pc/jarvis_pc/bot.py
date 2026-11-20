@@ -76,6 +76,7 @@ class JarvisBot:
         self.busy = asyncio.Lock()  # one request at a time keeps API spend predictable
 
     def ask(self, chat: str, text: str) -> str:
+        approvals.reset_turn()
         prompt = build_prompt(self.history.get(chat), text)
         reply = self.jarvis.ask(prompt, agent=self.agent, tools=self.tools, context=False)
         self.history.setdefault(chat, deque(maxlen=HISTORY_TURNS)).append((text, reply))

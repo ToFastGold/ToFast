@@ -5,7 +5,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import pytest
 from openjarvis.core.registry import ToolRegistry
 
-from jarvis_pc import phone_tools
+from jarvis_pc import approvals, phone_tools
 from jarvis_pc.bot import build_prompt
 
 TOKEN = "test-token"
@@ -50,6 +50,7 @@ def test_tools_registered():
 def test_call_sms_open(phone):
     assert ToolRegistry.get("phone_call")().execute(target="Мама").success
     assert ToolRegistry.get("phone_sms")().execute(target="+15550001", text="hi").success
+    assert approvals.confirm()[0]  # SMS waits for /yes
     assert ToolRegistry.get("phone_open_app")().execute(app="YouTube").success
     assert phone.received == [
         {"action": "call", "target": "Мама"},

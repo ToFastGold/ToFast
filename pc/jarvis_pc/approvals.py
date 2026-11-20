@@ -58,3 +58,30 @@ def cancel() -> str:
     with _lock:
         p, _pending = _pending, None
     return f"Отменено: {p.description}" if p else "Нечего отменять."
+
+
+# Untrusted content (email bodies) can carry instructions aimed at the model.
+# Once such content was read while handling the current message, outbound
+# actions that normally run directly also need /yes.
+_untrusted_seen = False
+
+
+def reset_turn() -> None:
+    global _untrusted_seen
+    _untrusted_seen = False
+
+
+def mark_untrusted() -> None:
+    global _untrusted_seen
+    _untrusted_seen = True
+
+
+def untrusted_seen() -> bool:
+    return _untrusted_seen
+
+
+def guard(description: str, run: Callable[[], tuple[bool, str]]) -> tuple[bool, str]:
+    """Run now, unless untrusted content was read this turn; then ask for /yes."""
+    if _untrusted_seen:
+        return request(description, run)
+    return run()
