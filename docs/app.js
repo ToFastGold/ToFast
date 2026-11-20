@@ -331,8 +331,9 @@
     </div>`;
   }
 
+  let pendingAsk = null;
   function igHandle(v) {
-    return String(v || '').trim().replace(/^@/, '').replace(/^(https?:\/\/)?(www\.)?instagram\.com\//i, '').split(/[/?#\s]/)[0];
+    return String(v || '').trim().replace(/^@/, '').replace(/^(https?:\/\/)?(www\.)?instagram\.com(\/|$)/i, '').split(/[/?#\s]/)[0];
   }
   function igUrl(v) { return 'https://www.instagram.com/' + encodeURIComponent(igHandle(v)) + '/'; }
 
@@ -361,12 +362,15 @@
       );
     }
     // Ask only once the user is back in the app (after sending in Instagram or the mail app).
+    if (pendingAsk) document.removeEventListener('visibilitychange', pendingAsk);
     const ask = () => {
       if (document.hidden) return;
       document.removeEventListener('visibilitychange', ask);
+      if (pendingAsk === ask) pendingAsk = null; else return;
       if (confirm('Сообщение отправлено? Отметить «написали».')) act('updateFound', { id: id, patch: { status: 'написали' } }, 'Отмечено');
     };
-    setTimeout(() => { if (document.hidden) document.addEventListener('visibilitychange', ask); else ask(); }, 1500);
+    pendingAsk = ask;
+    setTimeout(() => { if (pendingAsk !== ask) return; if (document.hidden) document.addEventListener('visibilitychange', ask); else ask(); }, 1500);
   }
 
   async function searchMaps() {
