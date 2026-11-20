@@ -1,5 +1,5 @@
 // Кэш оболочки приложения, чтобы оно открывалось как обычное приложение.
-const CACHE = 'alex-v5';
+const CACHE = 'alex-v6';
 const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'config.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -12,7 +12,8 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
   e.respondWith(
-    fetch(e.request).then((res) => {
+    // no-cache: always ask GitHub for the newest file, so an update shows up on the next open.
+    fetch(e.request.url, { cache: 'no-cache', credentials: 'same-origin' }).then((res) => {
       const copy = res.clone();
       caches.open(CACHE).then((c) => c.put(e.request, copy));
       return res;
