@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f1115">
+  <title>Цели</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main id="app">
+    <header class="top">
+      <button class="nav" id="prev" aria-label="Прошлый месяц">‹</button>
+      <h1 id="month">…</h1>
+      <button class="nav" id="next" aria-label="Следующий месяц">›</button>
+    </header>
+
+    <section class="hero">
+      <svg class="ring" viewBox="0 0 120 120" aria-hidden="true">
+        <circle cx="60" cy="60" r="52" class="ring-bg"/>
+        <circle cx="60" cy="60" r="52" class="ring-fg" id="ring"/>
+      </svg>
+      <div class="hero-text">
+        <div class="pct" id="pct">0%</div>
+        <div class="sub" id="sub"></div>
+      </div>
+    </section>
+
+    <section class="rewards" id="rewards"></section>
+
+    <section>
+      <h2>Цели</h2>
+      <ul class="goals" id="goals"></ul>
+      <p class="empty" id="empty" hidden>Целей на этот месяц пока нет. Добавь первую ниже.</p>
+      <button class="ghost" id="copy" hidden>Перенести цели с прошлого месяца</button>
+      <form class="add" id="add">
+        <input id="title" placeholder="Новая цель" maxlength="100" autocomplete="off">
+        <button type="submit">Добавить</button>
+      </form>
+    </section>
+
+    <details class="settings">
+      <summary>Награды и настройки</summary>
+      <p class="hint">Награда открывается, когда общий процент за месяц не ниже порога. В конце месяца Пятница пишет итог в Telegram.</p>
+      <div id="reward-edit"></div>
+      <button class="ghost" id="reward-add" type="button">+ ещё уровень</button>
+      <button id="reward-save" type="button">Сохранить награды</button>
+      <hr>
+      <button class="ghost" id="logout" type="button">Сменить токен</button>
+    </details>
+  </main>
+
+  <dialog id="login">
+    <form method="dialog" id="login-form">
+      <h2>Вход</h2>
+      <p>Впиши GOALS_API_TOKEN из файла goals/.env на компьютере. Телефон его запомнит.</p>
+      <input id="token" type="password" autocomplete="off" placeholder="токен">
+      <button type="submit">Войти</button>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" hidden></div>
+  <script src="/app.js"></script>
+</body>
+</html>
