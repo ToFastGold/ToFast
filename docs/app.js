@@ -312,6 +312,7 @@
       }
       askSent(b.dataset.sms);
     });
+    $view.querySelectorAll('[data-unskip]').forEach((b) => b.onclick = () => act('updateFound', { id: b.dataset.unskip, patch: { status: 'новый' } }, 'Вернул в «новый»'));
     $view.querySelectorAll('[data-skip]').forEach((b) => b.onclick = () => act('updateFound', { id: b.dataset.skip, patch: { status: 'не писать' } }, 'Отмечено'));
     $view.querySelectorAll('[data-fdel]').forEach((b) => b.onclick = async () => {
       if (!confirm('Удалить из списка?')) return;
@@ -334,6 +335,7 @@
         ${f.phone && f.status !== 'не писать' ? `<a class="btn" data-sms="${esc(f.id)}" href="${esc(smsUrl(f))}">SMS</a><a class="btn" href="tel:${esc(String(f.phone).replace(/[^\d+]/g, ''))}">Позвонить</a>` : ''}
         ${!canWrite && f.status !== 'не писать' ? `<button class="btn" data-igfind="${esc(f.id)}">Найти Instagram</button><button class="btn" data-igset="${esc(f.id)}">Вписать</button>` : ''}
         ${f.status === 'новый' ? `<button class="btn" data-skip="${esc(f.id)}">Не писать</button>` : ''}
+        ${f.status === 'не писать' ? `<button class="btn" data-unskip="${esc(f.id)}">Вернуть в новые</button>` : ''}
         <button class="btn danger" data-fdel="${esc(f.id)}">Удалить</button>
       </div>
     </div>`;
@@ -529,8 +531,9 @@
         <label class="f">Попыток дозвониться</label><input id="s-max" inputmode="numeric" value="${esc(s.max_attempts)}">
         <label class="f">Номер, с которого звонит Alex</label>
         <select id="s-num">
+          <option value="phnum_1001m7xbqh18f4br20t1vwzq21hr" ${s.phone_number_id === 'phnum_1001m7xbqh18f4br20t1vwzq21hr' ? 'selected' : ''}>+1 236 800 3855 (Канада, Alex)</option>
           <option value="phnum_5201m7v36e37epmrwpycavvgpvd3" ${s.phone_number_id === 'phnum_5201m7v36e37epmrwpycavvgpvd3' ? 'selected' : ''}>+1 217 727 6180 (США)</option>
-          <option value="phnum_1001m7v228xfemjryymf5m9egaq1" ${s.phone_number_id === 'phnum_1001m7v228xfemjryymf5m9egaq1' ? 'selected' : ''}>+1 236 969 9779 (Канада)</option>
+          <option value="phnum_1001m7v228xfemjryymf5m9egaq1" ${s.phone_number_id === 'phnum_1001m7v228xfemjryymf5m9egaq1' ? 'selected' : ''}>+1 236 969 9779 (твой личный)</option>
         </select>
       </div>
       <button class="btn primary block" id="s-save">Сохранить настройки</button>
