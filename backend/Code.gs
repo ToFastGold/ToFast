@@ -114,6 +114,7 @@ const ACTIONS = {
     const s = b.settings || {};
     SETTING_KEYS.forEach(function (k) { if (s[k] !== undefined) props.setProperty('S_' + k, String(s[k])); });
     if (b.api_key) props.setProperty('api_key', String(b.api_key).trim());
+    if (b.places_key) props.setProperty('places_key', String(b.places_key).trim());
     if (b.new_pin) props.setProperty('pin', String(b.new_pin).trim());
     return { ok: true, settings: publicSettings_() };
   },
@@ -150,24 +151,10 @@ const ACTIONS = {
     return withLock_(function () { return startCall_(b.id); });
   },
   addFound: function (b) {
-    return withLock_(function () {
-      const existing = rows_('found');
-      const seen = {};
-      existing.forEach(function (r) { seen[key_(r)] = true; });
-      let added = 0;
-      (b.items || []).forEach(function (it) {
-        const row = {
-          id: randomId_(10), business: it.business || '', category: it.category || '', city: it.city || '',
-          phone: normPhone_(it.phone) || '', email: it.email || '', instagram: it.instagram || '', website: it.website || '',
-          maps_url: it.maps_url || '', status: 'новый', contacted_at: '', note: it.note || '', created_at: nowIso_(),
-        };
-        if (!row.business || seen[key_(row)]) return;
-        seen[key_(row)] = true;
-        append_('found', row);
-        added++;
-      });
-      return { ok: true, added: added };
-    });
+    return withLock_(function () { return { ok: true, added: addFoundItems_(b.items || []) }; });
+  },
+  searchMaps: function (b) {
+    return searchMaps_(String(b.query || '').trim(), String(b.city || '').trim());
   },
   updateFound: function (b) {
     return withLock_(function () {
@@ -474,6 +461,7 @@ function publicSettings_() {
   const s = {};
   SETTING_KEYS.forEach(function (k) { s[k] = setting_(k); });
   s.api_key_set = !!prop_('api_key');
+  s.places_key_set = !!prop_('places_key');
   s.webhook_url = ScriptApp.getService().getUrl() + '?token=' + prop_('webhook_token');
   s.consent_text = CONSENT_TEXT;
   return s;
@@ -550,6 +538,88 @@ function remove_(kind, keyCol, keyVal) {
 }
 
 /* ---------- мелочи ---------- */
+
+/* ---------- найденные ---------- */
+
+function addFoundItems_(items) {
+  const seen = {};
+  rows_('found').forEach(function (r) { seen[key_(r)] = true; });
+  let added = 0;
+  items.forEach(function (it) {
+    const row = {
+      id: randomId_(10), business: it.business || '', category: it.category || '', city: it.city || '',
+      phone: normPhone_(it.phone) || '', email: it.email || '', instagram: it.instagram || '', website: it.website || '',
+      maps_url: it.maps_url || '', status: 'новый', contacted_at: '', note: it.note || '', created_at: nowIso_(),
+    };
+    if (!row.business || seen[key_(row)]) return;
+    seen[key_(row)] = true;
+    append_('found', row);
+    added++;
+  });
+  return added;
+}
+
+// Сайты, которые не считаются настоящим сайтом бизнеса: соцсети, запись и доставка.
+const NOT_A_SITE = ['instagram.com', 'facebook.com', 'fb.com', 'tiktok.com', 'linktr.ee', 'fresha.com', 'setmore.com',
+  'vagaro.com', 'booksy.com', 'squareup.com', 'janeapp.com', 'gettimely.com', 'mindbodyonline.com', 'schedulicity.com',
+  'styleseat.com', 'ubereats.com', 'doordash.com', 'skipthedishes.com', 'yelp.com', 'yelp.ca', 'google.com', 'business.site', 'g.page'];
+
+function classifySite_(url) {
+  if (!url) return { site: '', instagram: '', note: '' };
+  let host = '';
+  const m = String(url).match(/^https?:\/\/([^\/?#]+)/i);
+  if (m) host = m[1].toLowerCase().replace(/^www\./, '').replace(/^m\./, '');
+  const hit = NOT_A_SITE.filter(function (d) { return host === d || host.slice(-(d.length + 1)) === '.' + d; })[0];
+  if (!hit) return { site: url, instagram: '', note: '' };
+  if (hit === 'instagram.com') {
+    const h = String(url).replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').split(/[\/?#]/)[0];
+    return { site: '', instagram: h, note: '' };
+  }
+  return { site: '', instagram: '', note: 'В Google вместо сайта: ' + url };
+}
+
+/** Ищет бизнесы в Google Maps (Places API, Text Search) и добавляет в «Найденные» те, у кого нет своего сайта. */
+function searchMaps_(query, city) {
+  const key = prop_('places_key');
+  if (!key) throw new Error('Добавь ключ Google Maps в Настройках');
+  if (!query) throw new Error('Напиши, кого искать, например barber');
+  if (!city) throw new Error('Выбери город');
+  const fields = ['places.id', 'places.displayName', 'places.formattedAddress', 'places.nationalPhoneNumber',
+    'places.websiteUri', 'places.googleMapsUri', 'places.businessStatus', 'places.primaryTypeDisplayName', 'nextPageToken'].join(',');
+  const textQuery = query + ' in ' + city + ', BC, Canada';
+  let token = '';
+  let total = 0;
+  let withSite = 0;
+  const items = [];
+  for (let page = 0; page < 3; page++) {
+    const payload = { textQuery: textQuery, pageSize: 20, regionCode: 'CA', languageCode: 'en' };
+    if (token) payload.pageToken = token;
+    const res = UrlFetchApp.fetch('https://places.googleapis.com/v1/places:searchText', {
+      method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+      headers: { 'X-Goog-Api-Key': key, 'X-Goog-FieldMask': fields },
+      payload: JSON.stringify(payload),
+    });
+    const code = res.getResponseCode();
+    const data = JSON.parse(res.getContentText() || '{}');
+    if (code !== 200) throw new Error('Google Maps: ' + ((data.error && data.error.message) || ('ошибка ' + code)));
+    (data.places || []).forEach(function (p) {
+      if (p.businessStatus && p.businessStatus !== 'OPERATIONAL') return;
+      total++;
+      const c = classifySite_(p.websiteUri);
+      if (c.site) { withSite++; return; }
+      items.push({
+        business: (p.displayName && p.displayName.text) || '',
+        category: (p.primaryTypeDisplayName && p.primaryTypeDisplayName.text) || query,
+        city: city, phone: p.nationalPhoneNumber || '', instagram: c.instagram, maps_url: p.googleMapsUri || '',
+        note: [p.formattedAddress || '', c.note].filter(Boolean).join('. '),
+      });
+    });
+    token = data.nextPageToken || '';
+    if (!token) break;
+  }
+  const added = withLock_(function () { return addFoundItems_(items); });
+  return { ok: true, total: total, with_site: withSite, without_site: items.length, added: added };
+}
 
 function normPhone_(p) {
   const digits = String(p || '').replace(/\D/g, '');
