@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0b0a">
+  <title>Цели</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main id="app">
+    <header class="top">
+      <span class="brand">Пятница · цели</span>
+      <nav class="month-nav">
+        <button class="nav" id="prev" aria-label="Прошлый месяц">‹</button>
+        <span id="month">…</span>
+        <button class="nav" id="next" aria-label="Следующий месяц">›</button>
+      </nav>
+    </header>
+
+    <section class="card month-card">
+      <div class="card-head"><span class="label" id="month-label">Этот месяц</span><span class="pill" id="pill"></span></div>
+      <div class="big"><span id="pct">0</span><sup>%</sup></div>
+      <p class="muted" id="ratio"></p>
+      <div class="bars" id="bars"></div>
+      <p class="caption" id="bars-caption">Выполнено ÷ запланировано, по дням недели.</p>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><span class="label">Награды</span></div>
+      <div id="rewards"></div>
+    </section>
+
+    <section class="card" id="matrix-card">
+      <div class="card-head"><span class="label">Матрица привычек</span></div>
+      <div class="matrix-scroll" id="matrix-scroll"><div class="matrix" id="matrix"></div></div>
+      <div class="legend">
+        <span><i class="sq done"></i>Выполнено</span>
+        <span><i class="sq missed"></i>Пропущено</span>
+        <span><i class="sq due"></i>Сегодня</span>
+        <span><i class="sq upcoming"></i>Впереди</span>
+        <span><i class="sq off"></i>Не по плану</span>
+      </div>
+    </section>
+
+    <section class="card" id="trend-card">
+      <div class="card-head"><span class="label">Динамика</span><span class="pill" id="trend-pill"></span></div>
+      <svg class="trend" id="trend" role="img" aria-label="Процент выполнения по дням"></svg>
+      <p class="caption">Процент выполненного за каждый день. Пунктир: порог первой награды.</p>
+    </section>
+
+    <section class="coach" id="coach-box">
+      <blockquote id="coach"></blockquote>
+      <div class="coach-by"><span class="rule"></span>Пятница</div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><span class="label">Цели месяца</span></div>
+      <ul class="goals" id="goals"></ul>
+      <p class="muted" id="empty" hidden>Целей на этот месяц пока нет. Добавь первую ниже.</p>
+      <button class="link" id="copy" hidden>Перенести цели с прошлого месяца</button>
+      <form class="add" id="add">
+        <input id="title" placeholder="Новая цель" maxlength="100" autocomplete="off">
+        <div class="chips" id="add-days"></div>
+        <button type="submit" class="gold">Добавить цель</button>
+      </form>
+    </section>
+
+    <details class="card settings">
+      <summary class="label">Настройка наград</summary>
+      <p class="muted small">Награда открывается, когда общий процент за месяц не ниже порога. Первого числа Пятница пишет в Telegram итог месяца.</p>
+      <div id="reward-edit"></div>
+      <button class="link" id="reward-add" type="button">+ ещё уровень</button>
+      <button class="gold" id="reward-save" type="button">Сохранить награды</button>
+      <hr>
+      <button class="link" id="logout" type="button">Сменить токен</button>
+    </details>
+  </main>
+
+  <dialog id="login">
+    <form method="dialog" id="login-form">
+      <h2>Вход</h2>
+      <p>Впиши GOALS_API_TOKEN из файла .env на компьютере. Телефон его запомнит.</p>
+      <input id="token" type="password" autocomplete="off" placeholder="токен">
+      <button type="submit" class="gold">Войти</button>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" hidden></div>
+  <script src="/app.js"></script>
+</body>
+</html>
