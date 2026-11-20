@@ -304,6 +304,14 @@
       act('updateFound', { id: b.dataset.igset, patch: { instagram: handle } }, 'Instagram добавлен');
     });
     $view.querySelectorAll('[data-mail]').forEach((b) => b.onclick = (ev) => writeTo(b.dataset.mail, ev));
+    $view.querySelectorAll('[data-sms]').forEach((b) => b.onclick = (ev) => {
+      if (!state.data.settings.sender_contact) {
+        ev.preventDefault();
+        toast('Сначала заполни «Контакт для писем» в Настройках: закон Канады требует указать, как с тобой связаться.', true);
+        state.tab = 'settings'; render(); return;
+      }
+      askSent(b.dataset.sms);
+    });
     $view.querySelectorAll('[data-skip]').forEach((b) => b.onclick = () => act('updateFound', { id: b.dataset.skip, patch: { status: 'не писать' } }, 'Отмечено'));
     $view.querySelectorAll('[data-fdel]').forEach((b) => b.onclick = async () => {
       if (!confirm('Удалить из списка?')) return;
@@ -322,8 +330,8 @@
       ${f.note ? `<div class="small">${esc(f.note)}</div>` : ''}
       <div class="row">
         ${f.status !== 'не писать' && !f.email && ig ? `<a class="btn primary" data-mail="${esc(f.id)}" href="${esc(igUrl(f.instagram))}" target="_blank" rel="noopener">Написать в Instagram</a>` : ''}
-        ${f.status !== 'не писать' && (f.email || !ig) ? `<button class="btn primary" data-mail="${esc(f.id)}" ${canWrite ? '' : 'disabled'}>${canWrite ? 'Написать' : 'Нет контакта'}</button>` : ''}
-        ${ig ? `<a class="btn" href="${esc(igUrl(f.instagram))}" target="_blank" rel="noopener">Открыть Instagram</a>` : ''}
+        ${f.status !== 'не писать' && (f.email || (!ig && !f.phone)) ? `<button class="btn primary" data-mail="${esc(f.id)}" ${canWrite ? '' : 'disabled'}>${canWrite ? 'Написать' : 'Нет контакта'}</button>` : ''}
+        ${f.phone && f.status !== 'не писать' ? `<a class="btn" data-sms="${esc(f.id)}" href="${esc(smsUrl(f))}">SMS</a><a class="btn" href="tel:${esc(String(f.phone).replace(/[^\d+]/g, ''))}">Позвонить</a>` : ''}
         ${!canWrite && f.status !== 'не писать' ? `<button class="btn" data-igfind="${esc(f.id)}">Найти Instagram</button><button class="btn" data-igset="${esc(f.id)}">Вписать</button>` : ''}
         ${f.status === 'новый' ? `<button class="btn" data-skip="${esc(f.id)}">Не писать</button>` : ''}
         <button class="btn danger" data-fdel="${esc(f.id)}">Удалить</button>
@@ -332,10 +340,28 @@
   }
 
   let pendingAsk = null;
+  const SMS_TEXT = 'Hi {business}, this is {sender_name} from {brand}. I make simple websites for local businesses, from 99 CAD. If you want one, leave a request here: {link} Contact: {sender_contact}. Reply STOP and I will not text again.';
+  function smsUrl(f) {
+    const num = String(f.phone || '').replace(/[^\d+]/g, '');
+    return 'sms:' + num + '?body=' + encodeURIComponent(fillTemplate(SMS_TEXT, f));
+  }
   function igHandle(v) {
     return String(v || '').trim().replace(/^@/, '').replace(/^(https?:\/\/)?(www\.)?instagram\.com(\/|$)/i, '').split(/[/?#\s]/)[0];
   }
   function igUrl(v) { return 'https://www.instagram.com/' + encodeURIComponent(igHandle(v)) + '/'; }
+
+  function askSent(id) {
+    // Ask only once the user is back in the app (after sending in Instagram or the mail app).
+    if (pendingAsk) document.removeEventListener('visibilitychange', pendingAsk);
+    const ask = () => {
+      if (document.hidden) return;
+      document.removeEventListener('visibilitychange', ask);
+      if (pendingAsk === ask) pendingAsk = null; else return;
+      if (confirm('Сообщение отправлено? Отметить «написали».')) act('updateFound', { id: id, patch: { status: 'написали' } }, 'Отмечено');
+    };
+    pendingAsk = ask;
+    setTimeout(() => { if (pendingAsk !== ask) return; if (document.hidden) document.addEventListener('visibilitychange', ask); else ask(); }, 1500);
+  }
 
   async function writeTo(id, ev) {
     const f = state.data.found.find((x) => x.id === id);
@@ -361,16 +387,7 @@
         () => toast('Не удалось скопировать текст. Скопируй его из Настроек → текст письма.', true),
       );
     }
-    // Ask only once the user is back in the app (after sending in Instagram or the mail app).
-    if (pendingAsk) document.removeEventListener('visibilitychange', pendingAsk);
-    const ask = () => {
-      if (document.hidden) return;
-      document.removeEventListener('visibilitychange', ask);
-      if (pendingAsk === ask) pendingAsk = null; else return;
-      if (confirm('Сообщение отправлено? Отметить «написали».')) act('updateFound', { id: id, patch: { status: 'написали' } }, 'Отмечено');
-    };
-    pendingAsk = ask;
-    setTimeout(() => { if (pendingAsk !== ask) return; if (document.hidden) document.addEventListener('visibilitychange', ask); else ask(); }, 1500);
+    askSent(id);
   }
 
   async function searchMaps() {
