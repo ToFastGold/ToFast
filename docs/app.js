@@ -317,9 +317,15 @@
       window.location.href = 'mailto:' + encodeURIComponent(f.email) + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
     } else {
       const dm = body.replace(/reply to this email/gi, 'reply to this message').replace(/email you again/gi, 'message you again');
-      try { await navigator.clipboard.writeText(dm); toast('Текст скопирован. Вставь его в сообщение в Instagram.'); } catch (e) { /* ignore */ }
+      // Start the copy and open Instagram in the same click, so the browser does not block the new tab.
+      let copied;
+      try { copied = navigator.clipboard.writeText(dm); } catch (e) { copied = Promise.reject(e); }
       const handle = String(f.instagram).replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/\/$/, '');
       window.open('https://instagram.com/' + encodeURIComponent(handle), '_blank');
+      copied.then(
+        () => toast('Текст скопирован. Вставь его в сообщение в Instagram.'),
+        () => toast('Не удалось скопировать текст. Скопируй его из Настроек → текст письма.', true),
+      );
     }
     setTimeout(() => {
       if (confirm('Сообщение отправлено? Отметить «написали».')) act('updateFound', { id: id, patch: { status: 'написали' } }, 'Отмечено');
