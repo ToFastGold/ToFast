@@ -316,7 +316,8 @@
     if (f.email) {
       window.location.href = 'mailto:' + encodeURIComponent(f.email) + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
     } else {
-      try { await navigator.clipboard.writeText(body); toast('Текст скопирован. Вставь его в сообщение в Instagram.'); } catch (e) { /* ignore */ }
+      const dm = body.replace(/reply to this email/gi, 'reply to this message').replace(/email you again/gi, 'message you again');
+      try { await navigator.clipboard.writeText(dm); toast('Текст скопирован. Вставь его в сообщение в Instagram.'); } catch (e) { /* ignore */ }
       const handle = String(f.instagram).replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/\/$/, '');
       window.open('https://instagram.com/' + encodeURIComponent(handle), '_blank');
     }
