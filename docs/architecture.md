@@ -16,7 +16,7 @@
       +-- think, calculator, web_search (встроены в OpenJarvis)
       +-- notes_*  заметки: .md файлы в папке на ПК (можно папку Obsidian)
       +-- pc_*     ПК: открыть сайт/программу/файл, список файлов, PowerShell (через /yes)
-      +-- email_*  почта: UVic через Microsoft Graph или IMAP/SMTP; список, чтение, отправка (через /yes)
+      +-- email_*  почта: Gmail по IMAP/SMTP (UVic пересылается туда), запасной вход в Microsoft 365; список, чтение, отправка (через /yes)
       +-- goals_*  трекер целей (goals/, http://localhost:8787)
       +-- twilio_* звонок/SMS с Twilio-номера (выключено по умолчанию, платно, через /yes)
       +-- phone_call, phone_sms, phone_open_app (pc/jarvis_pc/phone_tools.py)
