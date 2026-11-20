@@ -40,8 +40,14 @@ def goals_status() -> tuple[bool, str]:
     data = httpx.get(_url("/api/summary"), headers=_headers(), timeout=10).raise_for_status().json()
     lines = [f"Месяц {data.get('month')}: выполнено {data.get('overall_percent')}%"]
     for g in data.get("goals", []):
-        mark = "сегодня ✓" if g.get("done_today") else "сегодня ещё нет"
-        lines.append(f"- {g.get('title')} (id {g.get('id')}): {g.get('percent')}%, {mark}")
+        if g.get("done_today"):
+            mark = "сегодня ✓"
+        elif g.get("scheduled_today", True):
+            mark = "сегодня ещё нет"
+        else:
+            mark = "сегодня не по расписанию"
+        streak = f", серия {g['streak']} дн." if g.get("streak") else ""
+        lines.append(f"- {g.get('title')} (id {g.get('id')}): {g.get('percent')}%, {mark}{streak}")
     if data.get("reward"):
         state = "открыта" if data.get("reward_unlocked") else "пока закрыта"
         lines.append(f"Награда «{data['reward']}»: {state}")

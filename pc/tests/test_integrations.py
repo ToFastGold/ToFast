@@ -86,7 +86,8 @@ class FakeGoals(BaseHTTPRequestHandler):
         self._send({
             "month": "2026-11", "overall_percent": 75.0, "reward_unlocked": True, "reward": "Кино",
             "next_reward": {"percent": 90, "text": "Наушники"}, "days_left": 10,
-            "goals": [{"id": "g1", "title": "Спорт", "percent": 80.0, "done_today": False}],
+            "goals": [{"id": "g1", "title": "Спорт", "percent": 80.0, "done_today": False, "streak": 3},
+                      {"id": "g2", "title": "Чтение", "percent": 50.0, "done_today": False, "scheduled_today": False}],
         })
 
     def do_POST(self):  # noqa: N802
@@ -104,6 +105,7 @@ def test_goals(monkeypatch):
     try:
         status = tool("goals_status").execute().content
         assert "75.0%" in status and "Спорт" in status and "Наушники" in status
+        assert "серия 3" in status and "не по расписанию" in status
         assert tool("goals_checkin").execute(goal_id="Спорт").success
         assert FakeGoals.posts[-1]["goal_id"] == "Спорт" and FakeGoals.posts[-1]["done"] is True
     finally:
