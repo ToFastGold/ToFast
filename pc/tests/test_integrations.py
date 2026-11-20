@@ -14,7 +14,7 @@ def tool(name):
 
 @pytest.fixture(autouse=True)
 def clean(monkeypatch, tmp_path):
-    for k in ("EMAIL_ADDRESS", "TWILIO_ENABLED", "GOALS_API_URL", "GOALS_API_TOKEN"):
+    for k in ("EMAIL_ADDRESS", "EMAIL_PROVIDER", "MS_CLIENT_ID", "TWILIO_ENABLED", "GOALS_API_URL", "GOALS_API_TOKEN"):
         monkeypatch.delenv(k, raising=False)
     monkeypatch.setenv("NOTES_DIR", str(tmp_path / "notes"))
     approvals.cancel()
@@ -139,3 +139,53 @@ def test_email(monkeypatch):
     assert sent == []
     approvals.confirm()
     assert sent == [("a@b.c", "s", "b")]
+
+
+class FakeResp:
+    def __init__(self, data):
+        self._data = data
+
+    def json(self):
+        return self._data
+
+
+def test_email_microsoft(monkeypatch):
+    from jarvis_pc import email_tools, ms_graph
+
+    monkeypatch.setenv("EMAIL_PROVIDER", "microsoft")
+    monkeypatch.setenv("MS_CLIENT_ID", "cid")
+    calls = []
+
+    def fake_request(method, path, **kw):
+        calls.append((method, path, kw))
+        if path.endswith("/messages"):
+            return FakeResp({"value": [{"id": "AAA", "subject": "Exam", "receivedDateTime": "2026-11-20",
+                                        "from": {"emailAddress": {"name": "Prof", "address": "p@uvic.ca"}}}]})
+        if path.startswith("/me/messages/"):
+            return FakeResp({"subject": "Exam", "from": {"emailAddress": {"name": "Prof", "address": "p@uvic.ca"}},
+                             "body": {"contentType": "html", "content": "<p>Room&nbsp;B12</p><style>x{}</style>"}})
+        return FakeResp({})
+
+    monkeypatch.setattr(ms_graph, "_request", fake_request)
+    assert email_tools.configured()
+    listed = tool("email_list").execute(unread_only=True).content
+    assert "[AAA]" in listed and "p@uvic.ca" in listed
+    assert calls[0][2]["params"]["$filter"] == "isRead eq false"
+    body = tool("email_read").execute(id="AAA").content
+    assert "Room" in body and "B12" in body and "<p>" not in body and "x{}" not in body
+    tool("email_send").execute(to="a@uvic.ca", subject="Hi", body="text")
+    assert approvals.confirm()[0]
+    method, path, kw = calls[-1]
+    assert (method, path) == ("POST", "/me/sendMail")
+    assert kw["json"]["message"]["toRecipients"] == [{"emailAddress": {"address": "a@uvic.ca"}}]
+
+
+def test_ms_not_logged_in(monkeypatch, tmp_path):
+    from jarvis_pc import ms_graph
+
+    monkeypatch.setenv("MS_CLIENT_ID", "00000000-0000-0000-0000-000000000000")
+    monkeypatch.setattr(ms_graph, "_cache_path", lambda: tmp_path / "tok.json")
+    monkeypatch.setattr(ms_graph, "_app", lambda: (type("A", (), {"get_accounts": lambda self: []})(), None))
+    monkeypatch.setattr(ms_graph, "_save", lambda c: None)
+    with pytest.raises(RuntimeError, match="login-email"):
+        ms_graph._token()

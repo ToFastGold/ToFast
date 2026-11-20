@@ -1,4 +1,7 @@
-"""Email over IMAP/SMTP. Works with Gmail, Outlook.com, Yandex, Mail.ru via an app password."""
+"""Email tools. Two backends:
+- Microsoft 365 (UVic) via Graph, see ms_graph.py (EMAIL_PROVIDER=microsoft)
+- IMAP/SMTP with an app password (Gmail, Yandex, Mail.ru)
+"""
 
 from __future__ import annotations
 
@@ -10,13 +13,17 @@ import smtplib
 from email.header import decode_header, make_header
 from email.message import EmailMessage
 
-from jarvis_pc import approvals
+from jarvis_pc import approvals, ms_graph
 from jarvis_pc._base import simple_tool, string
 
 TOOLS = ["email_list", "email_read", "email_send"]
 
 
 def configured() -> bool:
+    return ms_graph.configured() or imap_configured()
+
+
+def imap_configured() -> bool:
     return all(os.environ.get(k) for k in ("EMAIL_ADDRESS", "EMAIL_PASSWORD", "EMAIL_IMAP_HOST", "EMAIL_SMTP_HOST"))
 
 
@@ -47,6 +54,9 @@ def _body(msg: email.message.Message) -> str:
     "email",
 )
 def email_list(limit: int = 10, unread_only: bool = False) -> tuple[bool, str]:
+    if ms_graph.configured():
+        lines = ms_graph.list_messages(int(limit or 10), bool(unread_only))
+        return True, "\n".join(lines) if lines else "Писем нет."
     box = _imap()
     try:
         _, data = box.uid("search", None, "UNSEEN" if unread_only else "ALL")
@@ -65,6 +75,8 @@ def email_list(limit: int = 10, unread_only: bool = False) -> tuple[bool, str]:
 
 @simple_tool("email_read", "Read one email by the id shown in email_list.", {"id": string("Email id")}, ["id"], "email")
 def email_read(id: str) -> tuple[bool, str]:  # noqa: A002
+    if ms_graph.configured():
+        return True, ms_graph.read_message(id)
     box = _imap()
     try:
         _, msg_data = box.uid("fetch", str(id).encode(), "(BODY.PEEK[])")
@@ -77,6 +89,9 @@ def email_read(id: str) -> tuple[bool, str]:  # noqa: A002
 
 
 def _send(to: str, subject: str, body: str) -> tuple[bool, str]:
+    if ms_graph.configured():
+        ms_graph.send_message(to, subject, body)
+        return True, f"Письмо отправлено: {to}, тема «{subject}»."
     msg = EmailMessage()
     msg["From"] = os.environ["EMAIL_ADDRESS"]
     msg["To"] = to
