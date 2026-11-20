@@ -177,13 +177,17 @@ class Store:
     # ---------- rewards ----------
 
     def rewards_for(self, month: str) -> list[dict[str, Any]]:
-        return self.data["rewards"].get(month) or self.data["default_rewards"]
+        saved = self.data["rewards"].get(month)
+        return saved if saved is not None else self.data["default_rewards"]
 
     def set_rewards(self, rewards: Any, month: str | None = None) -> list[dict[str, Any]]:
         cleaned = clean_rewards(rewards)
         month = month or month_key(self.today())
         parse_month(month)
         with self.lock:
+            # Months that relied on the old defaults keep them, so past results don't change.
+            for m in {g["month"] for g in self.data["goals"]}:
+                self.data["rewards"].setdefault(m, list(self.data["default_rewards"]))
             self.data["rewards"][month] = cleaned
             self.data["default_rewards"] = cleaned  # next months start with the same list
             self.save()
@@ -228,7 +232,12 @@ class Store:
             tiers = self.rewards_for(month)
             unlocked = [r for r in tiers if overall >= r["percent"]] if total_counted else []
             locked = [r for r in tiers if r not in unlocked]
-            days_left = 0 if last < today else (last - max(today, first)).days + (0 if first > today else 1)
+            if last < today:
+                days_left = 0
+            elif first > today:
+                days_left = last.day
+            else:
+                days_left = (last - today).days + 1
             return {
                 "month": month,
                 "today": today.isoformat(),

@@ -168,3 +168,12 @@ def test_static_served_without_token(server):
         assert b"<title>" in r.read()
     status, _ = call(server + "/../goals.json", token="")
     assert status == 404
+
+
+def test_changing_rewards_keeps_other_months(store, clock):
+    store.add_goal("A", "2026-10")
+    store.set_rewards([], "2026-09")
+    store.set_rewards([{"percent": 90, "text": "new"}])
+    assert store.summary("2026-09")["rewards"] == []
+    assert [r["percent"] for r in store.summary("2026-10")["rewards"]] == [70, 80]
+    assert store.summary("2026-12")["days_left"] == 31
