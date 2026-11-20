@@ -1,0 +1,7 @@
+ToFast / Пятница (Jarvis)
+
+This project uses OpenJarvis (https://github.com/open-jarvis/OpenJarvis),
+Copyright Open Jarvis Contributors, licensed under the Apache License 2.0.
+OpenJarvis is installed as a pinned Python dependency (openjarvis==1.0.4);
+its source is not copied into this repository.
+See http://www.apache.org/licenses/LICENSE-2.0 for the license text.
